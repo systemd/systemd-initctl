@@ -78,7 +78,7 @@ static void process_requests(int fd) {
 		pfd.fd = fd;
 		pfd.events = POLLIN;
 
-		n = poll(&pfd, 1, 30);
+		n = poll(&pfd, 1, 30000);
 
 		if (n < 0) {
 			perror("Error waiting for input");
