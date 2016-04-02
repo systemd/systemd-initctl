@@ -74,10 +74,10 @@ static void process_requests(int fd) {
 	struct pollfd pfd;
 	struct init_request request;
 
-	for (;;) {
-		pfd.fd = fd;
-		pfd.events = POLLIN;
+	pfd.fd = fd;
+	pfd.events = POLLIN;
 
+	for (;;) {
 		n = poll(&pfd, 1, 30000);
 
 		if (n < 0) {
