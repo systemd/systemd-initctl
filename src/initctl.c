@@ -61,7 +61,7 @@ static void change_runlevel(int runlevel) {
 			sig = SIGTERM; /* daemon-reexec */
 			break;
 		default:
-			fprintf(stderr, SD_WARNING "Got request for unknown runlevel %c, ignoring.", runlevel);
+			fprintf(stderr, SD_WARNING "Got request for unknown runlevel %c, ignoring.\n", runlevel);
 			return;
 	}
 
