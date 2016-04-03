@@ -117,7 +117,6 @@ int main(void) {
 		return EX_NOINPUT;
 	}
 
-	sd_notify(false, "READY=1");
 	process_requests(SD_LISTEN_FDS_START);
 	close(SD_LISTEN_FDS_START);
 

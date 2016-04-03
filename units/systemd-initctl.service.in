@@ -12,4 +12,3 @@ DefaultDependencies=no
 
 [Service]
 ExecStart=@systemdutildir@/systemd-initctl
-NotifyAccess=all
