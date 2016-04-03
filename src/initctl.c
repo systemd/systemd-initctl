@@ -61,12 +61,12 @@ static void change_runlevel(int runlevel) {
 			sig = SIGTERM; /* daemon-reexec */
 			break;
 		default:
-			fprintf(stderr, "Got request for unknown runlevel %c, ignoring.", runlevel);
+			fprintf(stderr, SD_WARNING "Got request for unknown runlevel %c, ignoring.", runlevel);
 			return;
 	}
 
 	if (kill(1, sig) < 0)
-		fprintf(stderr, "Error sending signal %d: %m\n", sig);
+		fprintf(stderr, SD_ERR "Error sending signal %d: %m\n", sig);
 }
 
 static void process_requests(int fd) {
@@ -82,7 +82,7 @@ static void process_requests(int fd) {
 		n = poll(&pfd, 1, 30000);
 
 		if (n < 0) {
-			perror("Error waiting for input");
+			perror(SD_ERR "Error waiting for input");
 			exit(EX_IOERR);
 		}
 
@@ -92,7 +92,7 @@ static void process_requests(int fd) {
 		s = read(fd, &request, sizeof(request));
 
 		if (s < 0) {
-			perror("Error reading from pipe");
+			perror(SD_ERR "Error reading from pipe");
 			exit(EX_IOERR);
 		}
 
@@ -100,7 +100,7 @@ static void process_requests(int fd) {
 			break;
 
 		if (s != sizeof(request) || request.magic != INIT_MAGIC) {
-			fputs("Received bogus request\n", stderr);
+			fputs(SD_WARNING "Received bogus request\n", stderr);
 			continue;
 		}
 
@@ -113,7 +113,7 @@ static void process_requests(int fd) {
 
 int main(void) {
 	if (sd_listen_fds(false) != 1) {
-		fputs("Exactly one file descriptor must be passed from systemd.\n", stderr);
+		fputs(SD_ERR "Exactly one file descriptor must be passed from systemd.\n", stderr);
 		return EX_NOINPUT;
 	}
 
