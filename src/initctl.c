@@ -24,6 +24,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <sysexits.h>
 #include <unistd.h>
 
 #include <systemd/sd-daemon.h>
@@ -82,7 +83,7 @@ static void process_requests(int fd) {
 
 		if (n < 0) {
 			perror("Error waiting for input");
-			exit(EXIT_FAILURE);
+			exit(EX_IOERR);
 		}
 
 		if (n == 0)
@@ -92,7 +93,7 @@ static void process_requests(int fd) {
 
 		if (s < 0) {
 			perror("Error reading from pipe");
-			exit(EXIT_FAILURE);
+			exit(EX_IOERR);
 		}
 
 		if (s == 0)
@@ -113,7 +114,7 @@ static void process_requests(int fd) {
 int main(void) {
 	if (sd_listen_fds(false) != 1) {
 		fputs("Exactly one file descriptor must be passed from systemd.\n", stderr);
-		return EXIT_FAILURE;
+		return EX_NOINPUT;
 	}
 
 	sd_notify(false, "READY=1");
