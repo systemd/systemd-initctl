@@ -1,4 +1,4 @@
-AC_INIT([gentoo-systemd-initctl], [1.0])
+AC_INIT([systemd-initctl], [1])
 AM_INIT_AUTOMAKE([foreign subdir-objects])
 AC_PROG_CC
 PKG_CHECK_MODULES([LIBSYSTEMD], [libsystemd])
