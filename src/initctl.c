@@ -2,7 +2,7 @@
  *
  * Reads commands from a fifo and calls systemctl.
  *
- * Copyright 2016 Mike Gilbert
+ * Copyright 2016-2026 Mike Gilbert
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
