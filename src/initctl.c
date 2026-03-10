@@ -35,12 +35,27 @@
 
 extern char **environ;
 
+static bool init_halt = false;
+
+static void set_environment(char *data, size_t size) {
+	/* We only care about the INIT_HALT variable */
+	size_t maxlen;
+	for (size_t i = 0; i < size && data[i]; i += 1 + strnlen(data + i, maxlen)) {
+		maxlen = size - i;
+		if (maxlen >= 15 && !strncmp(data + i, "INIT_HALT=HALT", 15))
+			init_halt = true;
+		else if (maxlen >= 10 && (!strncmp(data + i, "INIT_HALT", 10) ||
+		                          !strncmp(data + i, "INIT_HALT=", 10)))
+			init_halt = false;
+	}
+}
+
 static void change_runlevel(int runlevel) {
 	char *verb;
 
 	switch (runlevel) {
 		case '0':
-			verb = "poweroff";
+			verb = init_halt ? "halt" : "poweroff";
 			break;
 		case '1':
 		case 'S':
@@ -75,6 +90,18 @@ static void change_runlevel(int runlevel) {
 		fprintf(stderr, SD_ERR "Failed to run systemctl: %s\n", strerror(r));
 	else if (wait(NULL) < 0)
 		fprintf(stderr, SD_ERR "Failed to wait for systemctl: %s\n", strerror(errno));
+}
+
+static void handle_request(struct init_request *request) {
+	switch (request->cmd) {
+		case INIT_CMD_RUNLVL:
+			change_runlevel(request->runlevel);
+			break;
+		case INIT_CMD_SETENV:
+		case INIT_CMD_UNSETENV:
+			set_environment(request->i.data, sizeof(request->i.data));
+			break;
+	}
 }
 
 static void process_requests(int fd) {
@@ -112,10 +139,7 @@ static void process_requests(int fd) {
 			continue;
 		}
 
-		if (request.cmd == INIT_CMD_RUNLVL)
-			change_runlevel(request.runlevel);
-
-		/* TODO: Add error messaging for other commands */
+		handle_request(&request);
 	}
 }
 
