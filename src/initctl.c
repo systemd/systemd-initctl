@@ -1,7 +1,6 @@
 /* initctl: A replacement for systemd-initctl
  *
- * Reads commands from /dev/initctl fifo.
- * Signals systemd for runlevel changes.
+ * Reads commands from a fifo and calls systemctl.
  *
  * Copyright 2016 Mike Gilbert
  *
@@ -19,54 +18,63 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <errno.h>
 #include <poll.h>
-#include <signal.h>
+#include <spawn.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sysexits.h>
+#include <sys/wait.h>
 #include <unistd.h>
 
 #include <systemd/sd-daemon.h>
 
 #include "initreq.h"
 
+extern char **environ;
+
 static void change_runlevel(int runlevel) {
-	int sig;
+	char *verb;
 
 	switch (runlevel) {
 		case '0':
-			sig = SIGRTMIN+4; /* poweroff.target */
+			verb = "poweroff";
 			break;
 		case '1':
 		case 'S':
 		case 's':
-			sig = SIGRTMIN+1; /* rescue.target */
+			verb = "rescue";
 			break;
 		case '2':
 		case '3':
 		case '4':
 		case '5':
-			sig = SIGRTMIN+0; /* default.target */
+			verb = "default";
 			break;
 		case '6':
-			sig = SIGRTMIN+5; /* reboot.target */
+			verb = "reboot";
 			break;
 		case 'Q':
 		case 'q':
-			sig = SIGHUP; /* daemon-reload */
+			verb = "daemon-reload";
 			break;
 		case 'U':
 		case 'u':
-			sig = SIGTERM; /* daemon-reexec */
+			verb = "daemon-reexec";
 			break;
 		default:
-			fprintf(stderr, SD_WARNING "Got request for unknown runlevel %c, ignoring.\n", runlevel);
+			fprintf(stderr, SD_WARNING "Got request for unknown runlevel '%c', ignoring.\n", runlevel);
 			return;
 	}
 
-	if (kill(1, sig) < 0)
-		fprintf(stderr, SD_ERR "Error sending signal %d: %m\n", sig);
+	char *argv[] = { "systemctl", verb, NULL };
+	int r = posix_spawnp(NULL, argv[0], NULL, NULL, argv, environ);
+	if (r)
+		fprintf(stderr, SD_ERR "Failed to run systemctl: %s\n", strerror(r));
+	else if (wait(NULL) < 0)
+		fprintf(stderr, SD_ERR "Failed to wait for systemctl: %s\n", strerror(errno));
 }
 
 static void process_requests(int fd) {
