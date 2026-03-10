@@ -120,5 +120,5 @@ int main(void) {
 	process_requests(SD_LISTEN_FDS_START);
 	close(SD_LISTEN_FDS_START);
 
-	return 0;
+	return EX_OK;
 }
