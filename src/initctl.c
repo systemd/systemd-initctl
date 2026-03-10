@@ -144,13 +144,12 @@ static void process_requests(int fd) {
 }
 
 int main(void) {
-	if (sd_listen_fds(false) != 1) {
+	if (sd_listen_fds(1) != 1) {
 		fputs(SD_ERR "Exactly one file descriptor must be passed from systemd.\n", stderr);
 		return EX_NOINPUT;
 	}
 
 	process_requests(SD_LISTEN_FDS_START);
-	close(SD_LISTEN_FDS_START);
 
 	return EX_OK;
 }
