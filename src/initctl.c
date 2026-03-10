@@ -117,7 +117,7 @@ static void process_requests(int fd) {
 		n = poll(&pfd, 1, 30000);
 
 		if (n < 0) {
-			perror(SD_ERR "Error waiting for input");
+			fprintf(stderr, SD_ERR "Error waiting for input: %s\n", strerror(errno));
 			exit(EX_IOERR);
 		}
 
@@ -127,7 +127,7 @@ static void process_requests(int fd) {
 		s = read(fd, &request, sizeof(request));
 
 		if (s < 0) {
-			perror(SD_ERR "Error reading from pipe");
+			fprintf(stderr, SD_ERR "Error reading from pipe: %s\n", strerror(errno));
 			exit(EX_IOERR);
 		}
 
