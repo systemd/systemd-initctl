@@ -1,5 +1,5 @@
 /*
- * initreq.h	Interface to talk to init through /dev/initctl.
+ * initreq.h	Interface to talk to init through /run/initctl.
  *
  *		Copyright (C) 1995-2004 Miquel van Smoorenburg
  *
@@ -25,10 +25,8 @@
 
 #include <sys/param.h>
 
-#if defined(__FreeBSD_kernel__)
-#  define INIT_FIFO  "/etc/.initctl"
-#else
-#  define INIT_FIFO  "/dev/initctl"
+#ifndef INIT_FIFO
+#define INIT_FIFO  "/run/initctl"
 #endif
 
 #define INIT_MAGIC 0x03091969
@@ -65,7 +63,7 @@ struct init_request_bsd {
 
 /*
  *	Because of legacy interfaces, "runlevel" and "sleeptime"
- *	aren't in a seperate struct in the union.
+ *	aren't in a separate struct in the union.
  *
  *	The weird sizes are because init expects the whole
  *	struct to be 384 bytes.
