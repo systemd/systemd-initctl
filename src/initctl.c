@@ -38,14 +38,13 @@ extern char **environ;
 static bool init_halt = false;
 
 static void set_environment(char *data, size_t size) {
-	/* We only care about the INIT_HALT variable */
-	size_t maxlen;
-	for (size_t i = 0; i < size && data[i]; i += 1 + strnlen(data + i, maxlen)) {
-		maxlen = size - i;
-		if (maxlen >= 15 && !strncmp(data + i, "INIT_HALT=HALT", 15))
+	data[size - 1] = '\0';
+	for (char *end = data + size; data < end && data && data[0];
+			data = strchr(data, '\0') + 1) {
+		/* We only care about the INIT_HALT variable */
+		if (!strcmp(data, "INIT_HALT=HALT"))
 			init_halt = true;
-		else if (maxlen >= 10 && (!strncmp(data + i, "INIT_HALT", 10) ||
-		                          !strncmp(data + i, "INIT_HALT=", 10)))
+		else if (!strcmp(data, "INIT_HALT") || !strncmp(data, "INIT_HALT=", 10))
 			init_halt = false;
 	}
 }
