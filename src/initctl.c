@@ -34,13 +34,11 @@
 #include "initreq.h"
 
 extern char **environ;
-
 static bool init_halt = false;
 
 static void set_environment(char *data, size_t size) {
 	data[size - 1] = '\0';
-	for (char *end = data + size; data < end && data && data[0];
-			data = strchr(data, '\0') + 1) {
+	for (char *end = data + size; data && data < end && *data; data = strchr(data, '\0') + 1) {
 		/* We only care about the INIT_HALT variable */
 		if (!strcmp(data, "INIT_HALT=HALT"))
 			init_halt = true;
@@ -91,64 +89,52 @@ static void change_runlevel(int runlevel) {
 		fprintf(stderr, SD_ERR "Failed to wait for systemctl: %s\n", strerror(errno));
 }
 
-static void handle_request(struct init_request *request) {
-	switch (request->cmd) {
-		case INIT_CMD_RUNLVL:
-			change_runlevel(request->runlevel);
-			break;
-		case INIT_CMD_SETENV:
-		case INIT_CMD_UNSETENV:
-			set_environment(request->i.data, sizeof(request->i.data));
-			break;
-	}
-}
-
-static void process_requests(int fd) {
-	int n;
-	ssize_t s;
-	struct pollfd pfd;
-	struct init_request request;
-
-	pfd.fd = fd;
-	pfd.events = POLLIN;
-
-	for (;;) {
-		n = poll(&pfd, 1, 30000);
-
-		if (n < 0) {
-			fprintf(stderr, SD_ERR "Error waiting for input: %s\n", strerror(errno));
-			exit(EX_IOERR);
-		}
-
-		if (n == 0)
-			break;
-
-		s = read(fd, &request, sizeof(request));
-
-		if (s < 0) {
-			fprintf(stderr, SD_ERR "Error reading from pipe: %s\n", strerror(errno));
-			exit(EX_IOERR);
-		}
-
-		if (s == 0)
-			break;
-
-		if (s != sizeof(request) || request.magic != INIT_MAGIC) {
-			fputs(SD_WARNING "Received bogus request\n", stderr);
-			continue;
-		}
-
-		handle_request(&request);
-	}
-}
-
 int main(void) {
 	if (sd_listen_fds(1) != 1) {
 		fputs(SD_ERR "Exactly one file descriptor must be passed from systemd.\n", stderr);
 		return EX_NOINPUT;
 	}
 
-	process_requests(SD_LISTEN_FDS_START);
+	int fd = SD_LISTEN_FDS_START;
+
+	for (;;) {
+		struct pollfd pfd = { .fd = fd, .events = POLLIN };
+		int n = poll(&pfd, 1, 30000);
+
+		if (n < 0) {
+			fprintf(stderr, SD_ERR "Error waiting for input: %s\n", strerror(errno));
+			return EX_IOERR;
+		}
+
+		if (n == 0 || !(pfd.revents & POLLIN))
+			break;
+
+		struct init_request req;
+		ssize_t s = read(fd, &req, sizeof(req));
+
+		if (s < 0) {
+			fprintf(stderr, SD_ERR "Error reading from pipe: %s\n", strerror(errno));
+			return EX_IOERR;
+		}
+
+		if (s == 0)
+			break;
+
+		if (s != sizeof(req) || req.magic != INIT_MAGIC) {
+			fputs(SD_WARNING "Received bogus request\n", stderr);
+			continue;
+		}
+
+		switch (req.cmd) {
+			case INIT_CMD_RUNLVL:
+				change_runlevel(req.runlevel);
+				break;
+			case INIT_CMD_SETENV:
+			case INIT_CMD_UNSETENV:
+				set_environment(req.i.data, sizeof(req.i.data));
+				break;
+		}
+	}
 
 	return EX_OK;
 }
