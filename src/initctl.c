@@ -20,20 +20,19 @@
 
 #include <errno.h>
 #include <poll.h>
-#include <spawn.h>
+#include <stdarg.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sysexits.h>
-#include <sys/wait.h>
 #include <unistd.h>
 
+#include <systemd/sd-bus.h>
 #include <systemd/sd-daemon.h>
 
 #include "initreq.h"
 
-extern char **environ;
 static bool init_halt = false;
 
 static void set_environment(char *data, size_t size) {
@@ -47,46 +46,99 @@ static void set_environment(char *data, size_t size) {
 	}
 }
 
-static void change_runlevel(int runlevel) {
-	char *verb;
+static int bus_call(const char *method, const char *types, ...) {
+	static sd_bus *bus = NULL;
+	int r;
 
+	for (int tries = 2; tries > 0; --tries) {
+		if (bus == NULL) {
+			r = sd_bus_new(&bus);
+			if (r < 0)
+				return r;
+
+			r = sd_bus_set_address(bus, "unix:path=/run/systemd/private");
+			if (r < 0)
+				return r;
+
+			r = sd_bus_start(bus);
+			if (r < 0)
+				return r;
+		}
+
+		va_list ap;
+		va_start(ap, types);
+
+		r = sd_bus_call_methodv(bus,
+			"org.freedesktop.systemd1",
+			"/org/freedesktop/systemd1",
+			"org.freedesktop.systemd1.Manager",
+			method, NULL, NULL, types, ap);
+
+		va_end(ap);
+
+		if (r == -ECONNRESET || r == -ENOTCONN) {
+			bus = sd_bus_unref(bus);
+			if (r == -ENOTCONN)
+				continue;
+		}
+
+		break;
+	}
+
+	return r;
+}
+
+static void reload(void) {
+	int r = bus_call("Reload", "");
+	if (r < 0)
+		fprintf(stderr, SD_ERR "Reload failed: %s\n", strerror(-r));
+}
+
+static void reexec(void) {
+	int r = bus_call("Reexecute", "");
+	if (r < 0 && r != -ECONNRESET)
+		fprintf(stderr, SD_ERR "Reexecute failed: %s\n", strerror(-r));
+}
+
+static void start_unit(const char *name, const char *mode) {
+	int r = bus_call("StartUnit", "ss", name, mode);
+	if (r < 0)
+		fprintf(stderr, SD_ERR "StartUnit(%s) failed: %s\n", name, strerror(-r));
+}
+
+static void change_runlevel(int runlevel) {
 	switch (runlevel) {
 		case '0':
-			verb = init_halt ? "halt" : "poweroff";
+			start_unit(init_halt ? "halt.target" : "poweroff.target",
+					"replace-irreversibly");
 			break;
 		case '1':
 		case 'S':
 		case 's':
-			verb = "rescue";
+			start_unit("rescue.target", "isolate");
 			break;
 		case '2':
 		case '3':
 		case '4':
+			start_unit("multi-user.target", "isolate");
+			break;
 		case '5':
-			verb = "default";
+			start_unit("graphical.target", "isolate");
 			break;
 		case '6':
-			verb = "reboot";
+			start_unit("reboot.target", "replace-irreversibly");
 			break;
 		case 'Q':
 		case 'q':
-			verb = "daemon-reload";
+			reload();
 			break;
 		case 'U':
 		case 'u':
-			verb = "daemon-reexec";
+			reexec();
 			break;
 		default:
 			fprintf(stderr, SD_WARNING "Got request for unknown runlevel '%c', ignoring.\n", runlevel);
-			return;
 	}
-
-	char *argv[] = { "systemctl", verb, NULL };
-	int r = posix_spawnp(NULL, argv[0], NULL, NULL, argv, environ);
-	if (r)
-		fprintf(stderr, SD_ERR "Failed to run systemctl: %s\n", strerror(r));
-	else if (wait(NULL) < 0)
-		fprintf(stderr, SD_ERR "Failed to wait for systemctl: %s\n", strerror(errno));
 }
 
 int main(void) {
