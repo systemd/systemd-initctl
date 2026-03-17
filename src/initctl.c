@@ -142,8 +142,12 @@ static void change_runlevel(int runlevel) {
 }
 
 int main(void) {
-	if (sd_listen_fds(1) != 1) {
-		fputs(SD_ERR "Exactly one file descriptor must be passed from systemd.\n", stderr);
+	int r = sd_listen_fds(1);
+	if (r != 1) {
+		if (r < 0)
+			fprintf(stderr, SD_ERR "Error calling sd_listen_fds: %s\n", strerror(-r));
+		else
+			fputs(SD_ERR "Wrong number of file descriptors.\n", stderr);
 		return EX_NOINPUT;
 	}
 
@@ -154,7 +158,7 @@ int main(void) {
 		int n = poll(&pfd, 1, 30000);
 
 		if (n < 0) {
-			fprintf(stderr, SD_ERR "Error waiting for input: %s\n", strerror(errno));
+			perror(SD_ERR "Error waiting for input");
 			return EX_IOERR;
 		}
 
@@ -165,7 +169,7 @@ int main(void) {
 		ssize_t s = read(fd, &req, sizeof(req));
 
 		if (s < 0) {
-			fprintf(stderr, SD_ERR "Error reading from pipe: %s\n", strerror(errno));
+			perror(SD_ERR "Error reading from pipe");
 			return EX_IOERR;
 		}
 
@@ -173,7 +177,7 @@ int main(void) {
 			break;
 
 		if (s != sizeof(req) || req.magic != INIT_MAGIC) {
-			fputs(SD_WARNING "Received bogus request\n", stderr);
+			fputs(SD_WARNING "Received bogus request.\n", stderr);
 			continue;
 		}
 
