@@ -1,7 +1,6 @@
-project(
-  'systemd-initctl',
-  'c',
-  version : '2',
+project('systemd-initctl', 'c',
+  version : '3',
+  meson_version : '>=0.61.0'
 )
 
 libsystemd = dependency('libsystemd')
