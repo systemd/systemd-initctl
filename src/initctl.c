@@ -68,7 +68,7 @@ static int bus_call(const char *method, const char *types, ...) {
 		va_list ap;
 		va_start(ap, types);
 
-		r = sd_bus_call_methodv(bus,
+		r = sd_bus_call_method_asyncv(bus, NULL,
 			"org.freedesktop.systemd1",
 			"/org/freedesktop/systemd1",
 			"org.freedesktop.systemd1.Manager",
@@ -76,10 +76,12 @@ static int bus_call(const char *method, const char *types, ...) {
 
 		va_end(ap);
 
+		if (r >= 0)
+			r = sd_bus_flush(bus);
+
 		if (r == -ECONNRESET || r == -ENOTCONN) {
 			bus = sd_bus_unref(bus);
-			if (r == -ENOTCONN)
-				continue;
+			continue;
 		}
 
 		break;
